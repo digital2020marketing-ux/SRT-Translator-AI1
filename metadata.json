@@ -1,0 +1,5 @@
+{
+  "name": "SRT Subtitle Translator",
+  "description": "An AI-powered tool to translate SRT subtitle files from English to Indonesian with high accuracy and contextual awareness, inspired by a premium GPT model.",
+  "requestFramePermissions": []
+}
