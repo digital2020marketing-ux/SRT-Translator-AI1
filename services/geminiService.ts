@@ -11,14 +11,13 @@ Aturan Penting:
 5. Jika ada kalimat yang sangat ambigu, berikan 2-3 alternatif terjemahan, tandai setiap alternatif dengan simbol ⚡.
 6. Hasil akhir harus dalam format .srt standar, tanpa mengubah atau menghapus timecode sama sekali. Kembalikan HANYA teks srt yang sudah diterjemahkan. Jangan menambahkan penjelasan atau teks pembuka/penutup.`;
 
-export const translateSrt = async (srtText: string): Promise<string> => {
-    if (!process.env.API_KEY) {
-        console.error("API_KEY environment variable not set.");
-        throw new Error("Kunci API tidak dikonfigurasi. Harap atur variabel lingkungan API_KEY pada platform hosting Anda (misalnya Vercel).");
+export const translateSrt = async (srtText: string, apiKey: string): Promise<string> => {
+    if (!apiKey) {
+        throw new Error("Kunci API tidak diberikan. Harap segarkan halaman dan masukkan kunci API Anda.");
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -37,6 +36,9 @@ export const translateSrt = async (srtText: string): Promise<string> => {
         
     } catch (error) {
         console.error("Error calling Gemini API:", error);
+        if (error instanceof Error && error.message.includes('API key not valid')) {
+             throw new Error("API Key yang Anda masukkan tidak valid. Silakan periksa kembali.");
+        }
         throw new Error("Terjadi kesalahan saat berkomunikasi dengan AI. Pastikan format SRT Anda benar dan coba lagi.");
     }
 };

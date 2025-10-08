@@ -4,10 +4,15 @@ import { translateSrt } from './services/geminiService';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import BackToTopButton from './components/BackToTopButton';
-import { SparklesIcon, TranslateIcon, UserIcon, ClipboardIcon, ClipboardCheckIcon, TrashIcon, ArrowUpTrayIcon, ArrowDownTrayIcon } from './components/IconComponents';
+import { SparklesIcon, TranslateIcon, UserIcon, ClipboardIcon, ClipboardCheckIcon, TrashIcon, ArrowUpTrayIcon, ArrowDownTrayIcon, KeyIcon } from './components/IconComponents';
 
 const App: React.FC = () => {
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+    
+    const [apiKey, setApiKey] = useState<string>('');
+    const [tempApiKey, setTempApiKey] = useState<string>('');
+    const [isApiKeySubmitted, setIsApiKeySubmitted] = useState<boolean>(false);
+
     const [userName, setUserName] = useState<string>('');
     const [tempUserName, setTempUserName] = useState<string>('');
     const [isNameSubmitted, setIsNameSubmitted] = useState<boolean>(false);
@@ -29,8 +34,26 @@ const App: React.FC = () => {
         }
     }, [theme]);
 
+    useEffect(() => {
+        const storedApiKey = localStorage.getItem('gemini-api-key');
+        if (storedApiKey) {
+            setApiKey(storedApiKey);
+            setIsApiKeySubmitted(true);
+        }
+    }, []);
+
     const toggleTheme = () => {
         setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+    };
+
+    const handleApiKeySubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (tempApiKey.trim()) {
+            const trimmedKey = tempApiKey.trim();
+            setApiKey(trimmedKey);
+            localStorage.setItem('gemini-api-key', trimmedKey);
+            setIsApiKeySubmitted(true);
+        }
     };
 
     const handleNameSubmit = (e: React.FormEvent) => {
@@ -46,13 +69,19 @@ const App: React.FC = () => {
             setError("Please enter some SRT text to translate.");
             return;
         }
+        if (!apiKey) {
+            setError("API Key tidak ditemukan. Mohon segarkan halaman dan masukkan kembali.");
+            setIsApiKeySubmitted(false); // Force re-entry
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setOutputText('');
         setIsCopied(false);
 
         try {
-            const result = await translateSrt(inputText);
+            const result = await translateSrt(inputText, apiKey);
             setOutputText(result);
         } catch (err) {
             setError(err instanceof Error ? err.message : "An unknown error occurred.");
@@ -60,7 +89,7 @@ const App: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [inputText]);
+    }, [inputText, apiKey]);
     
     const fallbackCopyTextToClipboard = (text: string) => {
         const textArea = document.createElement("textarea");
@@ -153,6 +182,39 @@ const App: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    const ApiKeyInputScreen = () => (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
+            <div className="w-full max-w-md text-center bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700">
+                <KeyIcon className="w-16 h-16 mx-auto text-brand-primary" />
+                <h1 className="text-3xl font-bold mt-4 text-slate-900 dark:text-white">Masukkan API Key Anda</h1>
+                <p className="mt-2 text-slate-600 dark:text-slate-400">
+                    Untuk menggunakan alat ini, Anda memerlukan Google AI API key. Kunci Anda akan disimpan dengan aman di browser Anda.
+                </p>
+                 <p className="mt-2 text-sm text-slate-500">
+                    Belum punya kunci? Dapatkan di{' '}
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline">
+                        Google AI Studio
+                    </a>.
+                </p>
+                <form onSubmit={handleApiKeySubmit} className="mt-8 flex flex-col gap-4">
+                    <div className="relative">
+                        <KeyIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <input
+                            type="password"
+                            value={tempApiKey}
+                            onChange={(e) => setTempApiKey(e.target.value)}
+                            placeholder="Masukkan Google AI API Key Anda"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-brand-primary focus:outline-none transition"
+                            required
+                        />
+                    </div>
+                    <button type="submit" className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg">
+                        Simpan & Lanjutkan
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
 
     const NameInputScreen = () => (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
@@ -284,7 +346,15 @@ const App: React.FC = () => {
         </div>
     );
 
-    return isNameSubmitted ? <TranslatorScreen /> : <NameInputScreen />;
+    if (!isApiKeySubmitted) {
+        return <ApiKeyInputScreen />;
+    }
+
+    if (!isNameSubmitted) {
+        return <NameInputScreen />;
+    }
+
+    return <TranslatorScreen />;
 };
 
 export default App;
