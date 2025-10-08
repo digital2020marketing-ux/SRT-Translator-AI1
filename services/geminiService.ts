@@ -14,7 +14,7 @@ Aturan Penting:
 export const translateSrt = async (srtText: string): Promise<string> => {
     if (!process.env.API_KEY) {
         console.error("API_KEY environment variable not set.");
-        throw new Error("Kunci API tidak dikonfigurasi. Silakan hubungi administrator.");
+        throw new Error("Kunci API tidak dikonfigurasi. Harap atur variabel lingkungan API_KEY pada platform hosting Anda (misalnya Vercel).");
     }
 
     try {
