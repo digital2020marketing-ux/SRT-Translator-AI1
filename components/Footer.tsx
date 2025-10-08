@@ -7,6 +7,17 @@ const Footer: React.FC = () => {
             <div className="container mx-auto px-4 text-center text-sm text-slate-500 dark:text-slate-400">
                 <p>Software ini dibuat oleh Dede Hery Suryana.</p>
                 <p className="mt-1">Isi materi terjemahan di luar tanggung jawab pembuat.</p>
+                <p className="mt-2">
+                    Butuh editor video subtitle? Coba{' '}
+                    <a 
+                        href="https://www.capcut.com/my-edit?from_page=landing_page&start_tab=video" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-brand-primary hover:underline font-medium"
+                    >
+                        CapCut
+                    </a>.
+                </p>
             </div>
         </footer>
     );

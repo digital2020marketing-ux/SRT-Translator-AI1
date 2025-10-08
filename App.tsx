@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { translateSrt } from './services/geminiService';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import BackToTopButton from './components/BackToTopButton';
-import { SparklesIcon, TranslateIcon, UserIcon, ClipboardIcon, ClipboardCheckIcon } from './components/IconComponents';
+import { SparklesIcon, TranslateIcon, UserIcon, ClipboardIcon, ClipboardCheckIcon, TrashIcon, ArrowUpTrayIcon, ArrowDownTrayIcon } from './components/IconComponents';
 
 const App: React.FC = () => {
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -17,6 +17,9 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isCopied, setIsCopied] = useState<boolean>(false);
+    const [originalFileName, setOriginalFileName] = useState<string | null>(null);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (theme === 'dark') {
@@ -59,13 +62,97 @@ const App: React.FC = () => {
         }
     }, [inputText]);
     
+    const fallbackCopyTextToClipboard = (text: string) => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000);
+            } else {
+                 setError('Gagal menyalin teks.');
+            }
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+            setError('Gagal menyalin teks.');
+        }
+
+        document.body.removeChild(textArea);
+    };
+
     const handleCopy = () => {
-        if(outputText) {
-            navigator.clipboard.writeText(outputText);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 2000);
+        if (!outputText) return;
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(outputText).then(() => {
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000);
+            }).catch(err => {
+                console.error('Async copy failed:', err);
+                fallbackCopyTextToClipboard(outputText);
+            });
+        } else {
+            fallbackCopyTextToClipboard(outputText);
         }
     };
+
+    const handleClear = () => {
+        setInputText('');
+        setOutputText('');
+        setError(null);
+        setOriginalFileName(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+    
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setOriginalFileName(file.name);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setInputText(event.target?.result as string);
+            };
+            reader.onerror = () => {
+                setError("Gagal membaca file. Silakan coba lagi.");
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    const handleDownload = () => {
+        if (!outputText) return;
+
+        const fileName = originalFileName
+            ? originalFileName.replace(/\.srt$/i, '') + '_indo.srt'
+            : 'translated_subtitle_indo.srt';
+
+        const blob = new Blob([outputText], { type: 'text/srt;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
 
     const NameInputScreen = () => (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
@@ -102,7 +189,7 @@ const App: React.FC = () => {
                         SRT <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary to-brand-secondary">Subtitle</span> Translator
                     </h1>
                     <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-600 dark:text-slate-400">
-                        Cukup tempel konten SRT Anda di bawah ini untuk mendapatkan terjemahan Bahasa Indonesia berkualitas premium.
+                        Unggah atau tempel konten SRT Anda untuk mendapatkan terjemahan Bahasa Indonesia berkualitas premium.
                     </p>
                 </div>
 
@@ -117,26 +204,47 @@ const App: React.FC = () => {
                             placeholder="1&#10;00:00:10,000 --> 00:00:12,000&#10;Break a leg, buddy!"
                             className="w-full h-96 p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-brand-primary focus:outline-none transition resize-none text-sm font-mono"
                         />
-                        <button
-                            onClick={handleTranslate}
-                            disabled={isLoading}
-                            className="mt-4 w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg disabled:bg-slate-400 disabled:dark:bg-slate-600 disabled:cursor-not-allowed disabled:transform-none"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Menerjemahkan...
-                                </>
-                            ) : (
-                                <>
-                                    <TranslateIcon className="w-5 h-5" />
-                                    Terjemahkan
-                                </>
-                            )}
-                        </button>
+                         <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".srt" className="hidden" aria-hidden="true" />
+                        <div className="mt-4 flex items-stretch gap-4">
+                            <button
+                                onClick={handleTranslate}
+                                disabled={isLoading || !inputText.trim()}
+                                className="flex-grow w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg disabled:bg-slate-400 disabled:dark:bg-slate-600 disabled:cursor-not-allowed disabled:transform-none"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Menerjemahkan...
+                                    </>
+                                ) : (
+                                    <>
+                                        <TranslateIcon className="w-5 h-5" />
+                                        Terjemahkan
+                                    </>
+                                )}
+                            </button>
+                             <button
+                                onClick={handleUploadClick}
+                                disabled={isLoading}
+                                title="Unggah File"
+                                aria-label="Unggah file SRT"
+                                className="flex-shrink-0 flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg disabled:bg-slate-100 disabled:dark:bg-slate-800 disabled:text-slate-400 disabled:dark:text-slate-500 disabled:cursor-not-allowed disabled:transform-none"
+                            >
+                                <ArrowUpTrayIcon className="w-6 h-6" />
+                            </button>
+                            <button
+                                onClick={handleClear}
+                                disabled={(!inputText && !outputText) || isLoading}
+                                title="Bersihkan"
+                                aria-label="Bersihkan input dan output"
+                                className="flex-shrink-0 flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg disabled:bg-slate-100 disabled:dark:bg-slate-800 disabled:text-slate-400 disabled:dark:text-slate-500 disabled:cursor-not-allowed disabled:transform-none"
+                            >
+                                <TrashIcon className="w-6 h-6" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Output Column */}
@@ -144,10 +252,16 @@ const App: React.FC = () => {
                         <div className="flex justify-between items-center mb-2">
                              <label htmlFor="output-srt" className="text-lg font-semibold">Indonesian SRT</label>
                              {outputText && (
-                                <button onClick={handleCopy} className="flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-secondary transition">
-                                    {isCopied ? <ClipboardCheckIcon className="w-4 h-4 text-green-500"/> : <ClipboardIcon className="w-4 h-4"/>}
-                                    {isCopied ? 'Disalin!' : 'Salin'}
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={handleCopy} className="flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-secondary transition">
+                                        {isCopied ? <ClipboardCheckIcon className="w-4 h-4 text-green-500"/> : <ClipboardIcon className="w-4 h-4"/>}
+                                        {isCopied ? 'Disalin!' : 'Salin'}
+                                    </button>
+                                     <button onClick={handleDownload} className="flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-secondary transition">
+                                        <ArrowDownTrayIcon className="w-4 h-4" />
+                                        Unduh
+                                    </button>
+                                </div>
                              )}
                         </div>
                         <div className="w-full h-96 p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl shadow-sm relative overflow-auto text-sm font-mono">
